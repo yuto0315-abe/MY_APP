@@ -99,13 +99,13 @@ class _LookOnlyCalendarState extends State<LookOnlyCalendar> {
         appointment: Appointment(
           startTime: DateTime(now.year, now.month, now.day, 10, 0),
           endTime: DateTime(now.year, now.month, now.day, 12, 0),
-          subject: '専門演習 (3・4限)',
+          subject: '専門演習(3・4限)',
           color: Colors.blue.shade700,
         ),
         ownerName: '山田 太郎',
         participants: <String>['山田 太郎', '佐藤 花子', '鈴木 一郎'],
         category: '授業',
-        location: '講義棟 302教室',
+        location: '講義棟302教室',
         notification: '15分前',
         description: '専門演習のグループワークと進捗確認を行います。',
       ),
@@ -113,15 +113,15 @@ class _LookOnlyCalendarState extends State<LookOnlyCalendar> {
         appointment: Appointment(
           startTime: DateTime(now.year, now.month, now.day + 1, 14, 0),
           endTime: DateTime(now.year, now.month, now.day + 1, 15, 0),
-          subject: '〇〇社 Web面接',
+          subject: 'オンライン Web面接',
           color: Colors.orange.shade800,
         ),
         ownerName: '山田 太郎',
-        participants: <String>['採用担当: 田中様', '山田 太郎'],
+        participants: <String>['山田 太郎'],
         category: '面接',
         location: 'オンライン (Zoom)',
-        notification: '30分前 / 10分前',
-        description: '一次面接。接続確認を事前に行ってください。',
+        notification: '',
+        description: '一次面接。接続確認を事前に行ってください'
       ),
     ];
     _appointmentRecordIndex = <String, _AppointmentRecord>{
@@ -314,11 +314,11 @@ class _LookOnlyCalendarState extends State<LookOnlyCalendar> {
               key: ValueKey<CalendarView>(_calendarView),
               controller: _calendarController,
               view: _calendarView,
-              firstDayOfWeek: 1, // 月曜始まり
+              firstDayOfWeek: 1, // 月曜日始まり
               headerHeight: _calendarView == CalendarView.month ? 46 : 0,
               viewHeaderHeight: _calendarView == CalendarView.month ? 30 : 0,
               todayHighlightColor: Colors.orangeAccent,
-              cellBorderColor: Colors.grey.withOpacity(0.1),
+              cellBorderColor: Colors.grey.withValues(alpha: 0.1),
               timeSlotViewSettings: TimeSlotViewSettings(
                 timeFormat: 'H',
                 timeRulerSize: 42,
@@ -341,7 +341,7 @@ class _LookOnlyCalendarState extends State<LookOnlyCalendar> {
                       final Appointment meeting = details.appointments.first;
                       return Container(
                         decoration: BoxDecoration(
-                          color: meeting.color.withOpacity(0.8),
+                          color: meeting.color.withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.white, width: 1),
                         ),
@@ -371,7 +371,7 @@ class _LookOnlyCalendarState extends State<LookOnlyCalendar> {
                   : null,
               dataSource: _getDataSource(),
 
-              // タップした時の見た目（仮のポップアップ）
+              // タップした時の見た目の仮のポップアップ
               onTap: (CalendarTapDetails details) {
                 if (_calendarView == CalendarView.day &&
                     details.targetElement == CalendarElement.appointment &&
@@ -586,7 +586,7 @@ class _LookOnlyCalendarState extends State<LookOnlyCalendar> {
     return _monthYearFormatter.format(date);
   }
 
-  // サンプルデータ（見た目確認用）
+  // サンプルデータ。見た目確認用。
   _DataSource _getDataSource() {
     final List<Appointment> appointments = _appointmentRecords
         .map((_AppointmentRecord record) => record.appointment)
@@ -767,7 +767,7 @@ class _AccountInfoPage extends StatelessWidget {
           const ListTile(
             leading: Icon(Icons.account_circle_outlined),
             title: Text('アカウント概要'),
-            subtitle: Text('登録情報や連携状態を確認できます'),
+            subtitle: Text('登録情報や連携状態を確認できます。'),
           ),
           const Divider(height: 1),
           ..._accountSections.map((item) {
@@ -830,7 +830,7 @@ class _AccountSectionTile extends StatelessWidget {
       onTap: () {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$title は準備中です')));
+        ).showSnackBar(SnackBar(content: Text('$title は準備中です。')));
       },
     );
   }
