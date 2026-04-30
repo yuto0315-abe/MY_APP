@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="上流工程サポートツール - 要件定義、システム構成図、UML、画面レイアウト、E-R図、ガントチャートを効率的に作成">
+  <title>UpStream | 上流工程サポートツール</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <button id="hamburger" class="hamburger" aria-label="メニュー">☰</button>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="logo-icon">▲</span>
+      <span>UpStream</span>
+    </div>
+    <nav>
+      <a data-tool="dashboard" class="active"><span class="nav-icon">📊</span><span>ダッシュボード</span></a>
+      <a data-tool="proposal"><span class="nav-icon">💡</span><span>技術スタック提案</span></a>
+      <a data-tool="requirements"><span class="nav-icon">📋</span><span>要件定義書</span></a>
+      <a data-tool="architecture"><span class="nav-icon">🏗️</span><span>システム構成図</span></a>
+      <a data-tool="uml"><span class="nav-icon">🔄</span><span>UML・画面遷移図</span></a>
+      <a data-tool="layout"><span class="nav-icon">📐</span><span>画面レイアウト</span></a>
+      <a data-tool="erdiagram"><span class="nav-icon">🗃️</span><span>E-R図</span></a>
+      <a data-tool="gantt"><span class="nav-icon">📅</span><span>ガントチャート</span></a>
+    </nav>
+    <div class="sidebar-footer">UpStream v1.0 © 2026</div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- Dashboard -->
+    <section id="dashboard" class="tool-section active">
+      <div class="section-header">
+        <h1>ダッシュボード</h1>
+        <p>上流工程の各ツールにすばやくアクセスできます</p>
+      </div>
+      <div class="card-grid" id="dashboard-cards"></div>
+    </section>
+
+    <!-- Proposal -->
+    <section id="proposal" class="tool-section">
+      <div class="section-header">
+        <h1>技術スタック提案</h1>
+        <p>プロジェクトの要件に最適なサービス・言語・機能を提案します</p>
+      </div>
+      <div class="proposal-layout">
+        <div class="card" id="proposal-form"></div>
+        <div class="card proposal-results" id="proposal-results">
+          <h3 style="color:var(--text-dim);text-align:center;padding:60px 0;">← プロジェクト情報を入力して提案を受けましょう</h3>
+        </div>
+      </div>
+    </section>
+
+    <!-- Requirements -->
+    <section id="requirements" class="tool-section">
+      <div class="section-header">
+        <h1>要件定義書</h1>
+        <p>テンプレートに沿って要件定義書を作成・エクスポートできます</p>
+      </div>
+      <div class="toolbar">
+        <span class="toolbar-title">要件定義書エディタ</span>
+        <button class="btn btn-sm btn-secondary" onclick="app.requirements.addSection()">＋ セクション追加</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn btn-sm btn-primary" onclick="app.requirements.exportDoc()">📄 エクスポート</button>
+      </div>
+      <div class="req-editor">
+        <div class="req-nav" id="req-nav"></div>
+        <div class="req-content" id="req-content"></div>
+      </div>
+    </section>
+
+    <!-- Architecture -->
+    <section id="architecture" class="tool-section">
+      <div class="section-header">
+        <h1>システム構成図</h1>
+        <p>コンポーネントをドラッグ＆ドロップしてシステム構成を設計します</p>
+      </div>
+      <div class="toolbar architecture-toolbar">
+        <div class="toolbar-left-group">
+          <span class="toolbar-title">構成図エディタ</span>
+          <div class="diagram-overlay-palette" id="arch-palette"></div>
+          <div class="diagram-style-controls" id="arch-style-controls">
+            <label class="diagram-style-field">
+              <span>文字サイズ</span>
+              <select id="arch-font-size">
+                <option value="12">12</option>
+                <option value="14" selected>14</option>
+                <option value="16">16</option>
+                <option value="18">18</option>
+                <option value="20">20</option>
+              </select>
+            </label>
+            <label class="diagram-style-field">
+              <span>文字色</span>
+              <details class="diagram-color-picker" id="arch-text-color-picker">
+                <summary class="diagram-color-button" id="arch-text-color-btn">
+                  <span class="diagram-color-sample" id="arch-text-color-sample"></span>
+                  <span class="diagram-color-text" id="arch-text-color-text">自動</span>
+                  <span class="diagram-color-caret">▾</span>
+                </summary>
+                <div class="diagram-color-menu" id="arch-text-color-menu" aria-label="文字色の選択">
+                  <button type="button" class="diagram-color-auto-row diagram-color-option" data-color="" data-label="自動">
+                    <span class="diagram-color-option-swatch diagram-color-option-auto"></span>
+                    <span>自動</span>
+                  </button>
+                  <div class="diagram-color-divider"></div>
+                  <div class="diagram-color-group-label">テーマの色</div>
+                  <div class="diagram-color-theme-row" id="arch-theme-row"></div>
+                  <div class="diagram-color-shade-grid" id="arch-shade-grid"></div>
+                  <div class="diagram-color-group-label">標準の色</div>
+                  <div class="diagram-color-standard-row" id="arch-standard-row"></div>
+                  <button type="button" class="diagram-color-other-btn" id="arch-other-color-btn">
+                    <span class="diagram-color-other-icon">🎨</span>
+                    <span>その他の色(M)...</span>
+                  </button>
+                </div>
+              </details>
+            </label>
+          </div>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <button class="btn btn-sm btn-secondary" onclick="app.architecture.clearAll()">🗑 クリア</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.architecture.autoLayout()">📐 自動配置</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn btn-sm btn-primary" onclick="app.architecture.exportSVG()">📥 SVGエクスポート</button>
+      </div>
+      <div class="diagram-workspace architecture-workspace">
+        <div class="diagram-canvas" id="arch-canvas">
+          <svg class="connections" id="arch-svg"></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- UML -->
+    <section id="uml" class="tool-section">
+      <div class="section-header">
+        <h1>UML・画面遷移図</h1>
+        <p>画面遷移やステートマシンの図を作成します</p>
+      </div>
+      <div class="toolbar">
+        <span class="toolbar-title">UMLエディタ</span>
+        <button class="btn btn-sm btn-secondary" onclick="app.uml.clearAll()">🗑 クリア</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn btn-sm btn-primary" onclick="app.uml.exportSVG()">📥 SVGエクスポート</button>
+      </div>
+      <div class="diagram-workspace">
+        <div class="diagram-palette" id="uml-palette"></div>
+        <div class="diagram-canvas" id="uml-canvas">
+          <svg class="connections" id="uml-svg"></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- Layout -->
+    <section id="layout" class="tool-section">
+      <div class="section-header">
+        <h1>画面レイアウト</h1>
+        <p>ワイヤーフレームをドラッグ＆ドロップで作成します</p>
+      </div>
+      <div class="toolbar">
+        <span class="toolbar-title">レイアウトエディタ</span>
+        <button class="btn btn-sm btn-secondary" onclick="app.layout.clearAll()">🗑 クリア</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn btn-sm btn-primary" onclick="app.layout.exportPNG()">📥 エクスポート</button>
+      </div>
+      <div class="diagram-workspace">
+        <div class="diagram-palette" id="layout-palette"></div>
+        <div class="layout-canvas" id="layout-canvas"></div>
+      </div>
+    </section>
+
+    <!-- ER Diagram -->
+    <section id="erdiagram" class="tool-section">
+      <div class="section-header">
+        <h1>E-R図</h1>
+        <p>エンティティとリレーションシップを視覚的に設計します</p>
+      </div>
+      <div class="toolbar">
+        <span class="toolbar-title">E-R図エディタ</span>
+        <button class="btn btn-sm btn-secondary" onclick="app.erdiagram.addEntity()">＋ エンティティ追加</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.erdiagram.addRelation()">🔗 リレーション追加</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.erdiagram.clearAll()">🗑 クリア</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn btn-sm btn-primary" onclick="app.erdiagram.exportSVG()">📥 SVGエクスポート</button>
+      </div>
+      <div class="diagram-canvas" id="er-canvas" style="height:calc(100vh - 240px);">
+        <svg class="connections" id="er-svg"></svg>
+      </div>
+    </section>
+
+    <!-- Gantt -->
+    <section id="gantt" class="tool-section">
+      <div class="section-header">
+        <h1>ガントチャート</h1>
+        <p>プロジェクトのスケジュールを視覚的に管理します</p>
+      </div>
+      <div class="toolbar">
+        <span class="toolbar-title">ガントチャート</span>
+        <button class="btn btn-sm btn-secondary" onclick="app.gantt.addPhase()">＋ フェーズ追加</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.gantt.addTask()">＋ タスク追加</button>
+        <div class="toolbar-sep"></div>
+        <button class="btn btn-sm btn-primary" onclick="app.gantt.exportCSV()">📥 CSVエクスポート</button>
+      </div>
+      <div class="gantt-container">
+        <div class="gantt-tasks">
+          <div class="gantt-tasks-header"><span>タスク名</span><span>開始日</span><span>終了日</span></div>
+          <div id="gantt-task-list"></div>
+        </div>
+        <div class="gantt-timeline">
+          <div class="gantt-timeline-header" id="gantt-header"></div>
+          <div class="gantt-bars" id="gantt-bars"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal Container -->
+  <div id="modal-container"></div>
+
+  <!-- Menu overlay for mobile hamburger -->
+  <div id="menu-overlay"></div>
+
+  <script src="js/core.js"></script>
+  <script src="js/proposal.js"></script>
+  <script src="js/requirements.js"></script>
+  <script src="js/diagram.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/erdiagram.js"></script>
+  <script src="js/gantt.js"></script>
+</body>
+</html>
