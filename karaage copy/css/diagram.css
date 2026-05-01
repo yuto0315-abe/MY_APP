@@ -245,7 +245,7 @@
 .diagram-workspace {
   display: flex; gap: 16px; height: calc(100vh - 220px);
 }
-.architecture-workspace { display: block; }
+.architecture-workspace { display: block; height: calc(100vh - 270px); }
 .architecture-workspace .diagram-canvas {
   height: 100%;
 }
@@ -342,12 +342,26 @@
 }
 
 /* Architecture Toolbar overrides */
+.architecture-toolbar {
+  gap: 10px !important;
+  height: auto !important;
+  padding: 12px !important;
+}
+.architecture-toolbar .btn {
+  font-size: 0.95rem !important;
+  padding: 8px 14px !important;
+  min-height: 38px !important;
+}
+.architecture-toolbar .toolbar-title {
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+}
 .architecture-toolbar .diagram-overlay-palette {
   position: static; top: auto; left: auto; z-index: auto;
   width: auto; padding: 0;
   background: transparent; border: none;
   border-radius: 0; backdrop-filter: none;
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 10px;
 }
 .architecture-toolbar .palette-dropdown {
   position: relative;
@@ -359,22 +373,50 @@
 .architecture-toolbar .palette-dropdown-btn,
 .architecture-toolbar .palette-action-btn {
   width: auto;
-  min-width: 116px;
-  padding: 6px 12px;
+  min-width: 110px;
+  padding: 8px 12px;
   white-space: nowrap;
+  font-size: 0.9rem !important;
 }
 .architecture-toolbar .palette-dropdown-menu {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
   width: auto;
-  min-width: 170px;
-  padding: 8px;
+  min-width: 200px;
+  padding: 10px;
   margin: 0;
   background: rgba(17, 24, 39, 0.95);
   grid-template-columns: repeat(4, minmax(0, 1fr));
   z-index: 80;
+  gap: 8px;
 }
+.architecture-toolbar .shape-option {
+  font-size: 1.4rem !important;
+  padding: 10px !important;
+}
+.architecture-toolbar .diagram-style-controls {
+  display: flex;
+  gap: 14px;
+}
+.architecture-toolbar .diagram-style-field {
+  font-size: 0.9rem !important;
+}
+.architecture-toolbar .diagram-style-field select,
+.architecture-toolbar .diagram-style-field input {
+  font-size: 0.9rem !important;
+  padding: 6px 10px !important;
+  min-height: 32px !important;
+}
+.architecture-toolbar .diagram-color-button {
+  font-size: 0.9rem !important;
+  padding: 6px 10px !important;
+}
+.architecture-toolbar .toolbar-sep {
+  height: 24px !important;
+}
+
+
 
 /* Diagram Canvas */
 .diagram-canvas {

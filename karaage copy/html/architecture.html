@@ -1,12 +1,14 @@
 <!-- Architecture -->
 <div class="section-header">
-  <h1>システム構成図</h1>
-  <p>コンポーネントをドラッグ＆ドロップしてシステム構成を設計します</p>
 </div>
 <div class="toolbar architecture-toolbar">
   <div class="toolbar-left-group">
-    <span class="toolbar-title">構成図エディタ</span>
     <div class="diagram-overlay-palette" id="arch-palette"></div>
+    <button class="btn btn-sm btn-secondary" onclick="app.architecture.clearAll()">クリア</button>
+    <button class="btn btn-sm btn-secondary" onclick="app.architecture.undoLastAction()">↩</button>
+    <button class="btn btn-sm btn-secondary" onclick="app.architecture.redoLastAction()">↪</button>
+    <button class="btn btn-sm btn-secondary" onclick="app.architecture.autoLayout()">🤖</button>
+    <div class="toolbar-sep"></div>
     <div class="diagram-style-controls" id="arch-style-controls">
       <label class="diagram-style-field">
         <span>文字サイズ</span>
@@ -47,10 +49,7 @@
     </div>
   </div>
   <div class="toolbar-spacer"></div>
-  <button class="btn btn-sm btn-secondary" onclick="app.architecture.clearAll()">🗑 クリア</button>
-  <button class="btn btn-sm btn-secondary" onclick="app.architecture.undoLastAction()">↩ 一つ戻る</button>
-  <button class="btn btn-sm btn-secondary" onclick="app.architecture.redoLastAction()">↪ 一つ先に戻る</button>
-  <button class="btn btn-sm btn-secondary" onclick="app.architecture.autoLayout()">📐 自動配置</button>
+  <button class="btn btn-sm btn-secondary" id="arch-shape-add-btn" onclick="event.stopPropagation(); openArchShapeMenu()">🔳 図形を追加</button>
   <div class="toolbar-sep"></div>
   <button class="btn btn-sm btn-primary" onclick="app.architecture.exportSVG()">📥 SVGエクスポート</button>
 </div>

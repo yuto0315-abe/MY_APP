@@ -132,6 +132,50 @@ function showModal(title, bodyHtml, onConfirm) {
   container.querySelector('.modal-overlay').addEventListener('click', e => { if(e.target === e.currentTarget) container.innerHTML = ''; });
 }
 
+// Helper to open the architecture shape palette from the toolbar.
+function openArchShapeMenu() {
+  const tryCall = () => {
+    if (window.app && app.architecture && typeof app.architecture.openPaletteMenu === 'function') {
+      app.architecture.openPaletteMenu();
+      return true;
+    }
+    return false;
+  };
+
+  if (tryCall()) return;
+
+  // If the app exists but the architecture tool hasn't been created yet,
+  // instantiate it here so the toolbar button can work without requiring
+  // a separate sidebar navigation click.
+  if (window.app && !app.architecture) {
+    try {
+      // Try to trigger the architecture section to initialize (click sidebar nav)
+      const navAnchor = document.querySelector('.sidebar nav a[data-tool="architecture"]');
+      if (navAnchor) navAnchor.click();
+      // If clicking didn't create it immediately, try to instantiate as fallback
+      if (!app.architecture) app.architecture = new DiagramTool('arch', archComponents, { paletteMode: 'dropdown' });
+      // Give it a short moment to build DOM and then open menu.
+      setTimeout(() => { tryCall(); }, 120);
+      return;
+    } catch (err) {
+      console.warn('[openArchShapeMenu] failed to create app.architecture', err);
+    }
+  }
+
+  // Fallback retry loop (for cases where app isn't ready yet)
+  const timeout = 2000; // retry window
+  const start = Date.now();
+  const retry = () => {
+    if (tryCall()) return;
+    if (Date.now() - start > timeout) {
+      console.warn('[openArchShapeMenu] app.architecture not ready');
+      return;
+    }
+    setTimeout(retry, 80);
+  };
+  setTimeout(retry, 80);
+}
+
 // --- Hamburger menu toggle (mobile) ---
 document.addEventListener('DOMContentLoaded', async () => {
   // instantiate app & load HTML partials

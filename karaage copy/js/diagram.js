@@ -67,9 +67,27 @@ class DiagramTool {
     ];
     this.canvas = document.getElementById(prefix + '-canvas');
     this.svg = document.getElementById(prefix + '-svg');
-    this.initPalette();
-    this.initCanvasEvents();
-    this.initTextStyleControls();
+
+    // If the partial HTML hasn't been inserted yet, the canvas/svg may be null.
+    // Wait until they exist before initializing event handlers and controls.
+    if (!this.canvas || !this.svg) {
+      const tryInit = () => {
+        this.canvas = document.getElementById(prefix + '-canvas');
+        this.svg = document.getElementById(prefix + '-svg');
+        if (this.canvas && this.svg) {
+          this.initPalette();
+          this.initCanvasEvents();
+          this.initTextStyleControls();
+        } else {
+          setTimeout(tryInit, 50);
+        }
+      };
+      tryInit();
+    } else {
+      this.initPalette();
+      this.initCanvasEvents();
+      this.initTextStyleControls();
+    }
   }
   initPalette() {
     const palette = document.getElementById(this.prefix + '-palette');
@@ -89,6 +107,12 @@ class DiagramTool {
         e.stopPropagation();
         shapeMenu.classList.toggle('open');
       });
+      // If this is the architecture toolbar, remove the left-side toggle button
+      // to avoid duplicate "図形を追加" controls — the toolbar button will
+      // toggle the same menu instead.
+      if (this.prefix === 'arch') {
+        toggleButton.remove();
+      }
       shapeMenu.querySelectorAll('.shape-option').forEach(option => {
         option.addEventListener('click', () => {
           const idx = parseInt(option.dataset.idx, 10);
@@ -97,8 +121,16 @@ class DiagramTool {
           shapeMenu.classList.remove('open');
         });
       });
+      // Close menu only when clicking outside palette, menu, and toolbar button
+      const toolbarBtnId = this.prefix + '-shape-add-btn';
       document.addEventListener('click', e => {
-        if (!palette.contains(e.target)) shapeMenu.classList.remove('open');
+        const toolbarBtn = document.getElementById(toolbarBtnId);
+        const isOutsidePalette = !palette.contains(e.target);
+        const isOutsideMenu = !shapeMenu.contains(e.target);
+        const isOutsideBtn = !toolbarBtn || !toolbarBtn.contains(e.target);
+        if (isOutsidePalette && isOutsideMenu && isOutsideBtn) {
+          shapeMenu.classList.remove('open');
+        }
       });
     } else {
       palette.innerHTML = '<div class="palette-title">コンポーネント</div>' +
@@ -166,6 +198,7 @@ class DiagramTool {
       const isEditingField = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
       if (isEditingField) return;
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      console.debug('[DiagramTool] keydown', e.key, 'selectedNode=', this.selectedNode && this.selectedNode.id);
       if (!this.selectedNode) return;
       e.preventDefault();
       this.deleteSelectedNode();
@@ -544,10 +577,12 @@ class DiagramTool {
   deleteSelectedNode() {
     const node = this.selectedNode;
     if (!node) {
+      console.debug('[DiagramTool] deleteSelectedNode called but no selection');
       showToast('削除する図形を選択してください');
       return;
     }
 
+    console.debug('[DiagramTool] deleting node', node.id);
     const snapshotNode = { ...node };
     const snapshotConnections = this.connections
       .filter(conn => conn.from === node.id || conn.to === node.id)
@@ -751,6 +786,39 @@ class DiagramTool {
     this.svg.innerHTML = '';
     this.pushUndoAction({ type: 'clearAll', snapshot });
     showToast('キャンバスをクリアしました');
+  }
+  openPaletteMenu() {
+    const menuId = this.prefix + '-shape-menu';
+    const toggleId = this.prefix + '-shape-toggle';
+    const btnId = this.prefix + '-shape-add-btn';
+    const tryOpen = () => {
+      const menu = document.getElementById(menuId);
+      const toggle = document.getElementById(toggleId);
+      const btn = document.getElementById(btnId);
+      if (menu) {
+        menu.classList.add('open');
+        // For architecture, dynamically position menu under the toolbar button
+        if (this.prefix === 'arch' && btn) {
+          const btnRect = btn.getBoundingClientRect();
+          menu.style.position = 'fixed';
+          menu.style.top = (btnRect.bottom + 8) + 'px';
+          menu.style.left = (btnRect.left) + 'px';
+          menu.style.width = 'auto';
+          menu.style.zIndex = '100';
+        }
+        return true;
+      }
+      if (toggle) {
+        toggle.click();
+        return true;
+      }
+      return false;
+    };
+    if (!tryOpen()) {
+      // Retry shortly until initPalette has created the DOM
+      const retry = () => { if (!tryOpen()) setTimeout(retry, 60); };
+      setTimeout(retry, 60);
+    }
   }
   autoLayout() {
     const cols = Math.ceil(Math.sqrt(this.nodes.length));
