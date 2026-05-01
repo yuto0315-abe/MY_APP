@@ -5,6 +5,8 @@ class ERDiagramTool {
     this.relations = [];
     this.entityIdCounter = 0;
     this.selectedEntity = null;
+    this.undoHistory = [];
+    this.isApplyingUndo = false;
     this.canvas = document.getElementById('er-canvas');
     this.svg = document.getElementById('er-svg');
     this.connectingFrom = null;
@@ -27,6 +29,12 @@ class ERDiagramTool {
     const entity = { id, name, attrs, x, y };
     this.entities.push(entity);
     this.renderEntity(entity);
+    this.pushUndoAction({
+      type: 'removeEntity',
+      entityId: entity.id,
+      entityIndex: this.entities.length - 1,
+      entityIdCounter: this.entityIdCounter - 1,
+    });
     return entity;
   }
   addEntity() {
@@ -71,28 +79,62 @@ class ERDiagramTool {
           this.relations.push({from: this.connectingFrom.id, to: entity.id, label});
           this.drawRelations();
           document.getElementById(this.connectingFrom.id)?.classList.remove('selected');
+          this.pushUndoAction({
+            type: 'removeRelation',
+            from: this.connectingFrom.id,
+            to: entity.id,
+            label,
+          });
           this.connectingFrom = null;
         }
         return;
       }
       dragging = true;
       this.selectEntity(entity, el);
+      const dragStart = { x: entity.x, y: entity.y };
+      let moved = false;
       ox = e.clientX - entity.x;
       oy = e.clientY - entity.y;
       e.preventDefault();
+      const onMouseMove = event => {
+        if (!dragging) return;
+        const nextX = event.clientX - ox;
+        const nextY = event.clientY - oy;
+        if (nextX !== entity.x || nextY !== entity.y) moved = true;
+        entity.x = nextX;
+        entity.y = nextY;
+        el.style.left = entity.x + 'px';
+        el.style.top = entity.y + 'px';
+        this.drawRelations();
+      };
+      const onMouseUp = () => {
+        if (dragging && moved) {
+          this.pushUndoAction({
+            type: 'moveEntity',
+            entityId: entity.id,
+            x: dragStart.x,
+            y: dragStart.y,
+          });
+        }
+        dragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     });
-    document.addEventListener('mousemove', e => {
-      if (!dragging) return;
-      entity.x = e.clientX - ox;
-      entity.y = e.clientY - oy;
-      el.style.left = entity.x + 'px';
-      el.style.top = entity.y + 'px';
-      this.drawRelations();
-    });
-    document.addEventListener('mouseup', () => { dragging = false; });
     el.addEventListener('dblclick', () => {
       const newName = prompt('テーブル名:', entity.name);
-      if (newName) { entity.name = newName; el.querySelector('.er-entity-header').textContent = newName; }
+      if (newName && newName !== entity.name) {
+        const oldName = entity.name;
+        entity.name = newName;
+        el.querySelector('.er-entity-header').textContent = newName;
+        this.pushUndoAction({
+          type: 'renameEntity',
+          entityId: entity.id,
+          name: oldName,
+        });
+      }
     });
     this.canvas.appendChild(el);
   }
@@ -115,6 +157,97 @@ class ERDiagramTool {
       }
     };
     setTimeout(() => this.canvas.addEventListener('mousedown', handler), 100);
+  }
+  pushUndoAction(action) {
+    if (this.isApplyingUndo || !action) return;
+    this.undoHistory.push(action);
+  }
+  getEntityById(entityId) {
+    return this.entities.find(entity => entity.id === entityId) || null;
+  }
+  removeEntityById(entityId) {
+    const index = this.entities.findIndex(entity => entity.id === entityId);
+    if (index < 0) return null;
+    const [entity] = this.entities.splice(index, 1);
+    const removedRelations = this.relations.filter(rel => rel.from === entityId || rel.to === entityId);
+    this.relations = this.relations.filter(rel => rel.from !== entityId && rel.to !== entityId);
+    const el = document.getElementById(entityId);
+    if (el) el.remove();
+    if (this.selectedEntity && this.selectedEntity.id === entityId) this.selectedEntity = null;
+    if (this.connectingFrom && this.connectingFrom.id === entityId) this.connectingFrom = null;
+    return { entity, removedRelations };
+  }
+  restoreSnapshot(snapshot) {
+    if (!snapshot) return;
+    this.entities = snapshot.entities.map(entity => ({ ...entity, attrs: entity.attrs.map(attr => ({ ...attr })) }));
+    this.relations = snapshot.relations.map(rel => ({ ...rel }));
+    this.entityIdCounter = snapshot.entityIdCounter;
+    this.selectedEntity = null;
+    this.connectingFrom = null;
+    this.canvas.querySelectorAll('.er-entity').forEach(e => e.remove());
+    this.svg.innerHTML = '';
+    this.entities.forEach(entity => this.renderEntity(entity));
+    this.drawRelations();
+  }
+  undoLastAction() {
+    const action = this.undoHistory.pop();
+    if (!action) {
+      showToast('戻せる操作がありません');
+      return;
+    }
+
+    this.isApplyingUndo = true;
+    try {
+      if (action.type === 'removeEntity') {
+        this.removeEntityById(action.entityId);
+        this.entityIdCounter = action.entityIdCounter;
+        this.drawRelations();
+        showToast('一つ戻しました');
+        return;
+      }
+
+      if (action.type === 'moveEntity') {
+        const entity = this.getEntityById(action.entityId);
+        const el = entity ? document.getElementById(entity.id) : null;
+        if (entity && el) {
+          entity.x = action.x;
+          entity.y = action.y;
+          el.style.left = `${entity.x}px`;
+          el.style.top = `${entity.y}px`;
+          this.drawRelations();
+        }
+        showToast('一つ戻しました');
+        return;
+      }
+
+      if (action.type === 'renameEntity') {
+        const entity = this.getEntityById(action.entityId);
+        const el = entity ? document.getElementById(entity.id) : null;
+        if (entity && el) {
+          entity.name = action.name;
+          el.querySelector('.er-entity-header').textContent = action.name;
+        }
+        showToast('一つ戻しました');
+        return;
+      }
+
+      if (action.type === 'removeRelation') {
+        this.relations = this.relations.filter(rel => !(rel.from === action.from && rel.to === action.to && rel.label === action.label));
+        this.drawRelations();
+        showToast('一つ戻しました');
+        return;
+      }
+
+      if (action.type === 'clearAll') {
+        this.restoreSnapshot(action.snapshot);
+        showToast('一つ戻しました');
+        return;
+      }
+
+      showToast('戻し処理に失敗しました');
+    } finally {
+      this.isApplyingUndo = false;
+    }
   }
   drawRelations() {
     this.svg.innerHTML = '<defs><marker id="er-arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#06b6d4"/></marker></defs>';
@@ -145,9 +278,15 @@ class ERDiagramTool {
     });
   }
   clearAll() {
+    const snapshot = {
+      entities: this.entities.map(entity => ({ ...entity, attrs: entity.attrs.map(attr => ({ ...attr })) })),
+      relations: this.relations.map(rel => ({ ...rel })),
+      entityIdCounter: this.entityIdCounter,
+    };
     this.entities = []; this.relations = []; this.entityIdCounter = 0;
     this.canvas.querySelectorAll('.er-entity').forEach(e => e.remove());
     this.svg.innerHTML = '';
+    this.pushUndoAction({ type: 'clearAll', snapshot });
     showToast('E-R図をクリアしました');
   }
   exportSVG() {

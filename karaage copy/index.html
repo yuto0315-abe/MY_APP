@@ -123,6 +123,8 @@
         </div>
         <div class="toolbar-spacer"></div>
         <button class="btn btn-sm btn-secondary" onclick="app.architecture.clearAll()">🗑 クリア</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.architecture.undoLastAction()">↩ 一つ戻る</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.architecture.redoLastAction()">↪ 一つ先に戻る</button>
         <button class="btn btn-sm btn-secondary" onclick="app.architecture.autoLayout()">📐 自動配置</button>
         <div class="toolbar-sep"></div>
         <button class="btn btn-sm btn-primary" onclick="app.architecture.exportSVG()">📥 SVGエクスポート</button>
@@ -143,6 +145,7 @@
       <div class="toolbar">
         <span class="toolbar-title">UMLエディタ</span>
         <button class="btn btn-sm btn-secondary" onclick="app.uml.clearAll()">🗑 クリア</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.uml.undoLastAction()">↩ 一つ戻る</button>
         <div class="toolbar-sep"></div>
         <button class="btn btn-sm btn-primary" onclick="app.uml.exportSVG()">📥 SVGエクスポート</button>
       </div>
@@ -163,6 +166,7 @@
       <div class="toolbar">
         <span class="toolbar-title">レイアウトエディタ</span>
         <button class="btn btn-sm btn-secondary" onclick="app.layout.clearAll()">🗑 クリア</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.layout.undoLastAction()">↩ 一つ戻る</button>
         <div class="toolbar-sep"></div>
         <button class="btn btn-sm btn-primary" onclick="app.layout.exportPNG()">📥 エクスポート</button>
       </div>
@@ -183,6 +187,7 @@
         <button class="btn btn-sm btn-secondary" onclick="app.erdiagram.addEntity()">＋ エンティティ追加</button>
         <button class="btn btn-sm btn-secondary" onclick="app.erdiagram.addRelation()">🔗 リレーション追加</button>
         <button class="btn btn-sm btn-secondary" onclick="app.erdiagram.clearAll()">🗑 クリア</button>
+        <button class="btn btn-sm btn-secondary" onclick="app.erdiagram.undoLastAction()">↩ 一つ戻る</button>
         <div class="toolbar-sep"></div>
         <button class="btn btn-sm btn-primary" onclick="app.erdiagram.exportSVG()">📥 SVGエクスポート</button>
       </div>

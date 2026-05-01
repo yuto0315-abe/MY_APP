@@ -4,6 +4,8 @@ class LayoutTool {
     this.elements = [];
     this.elemIdCounter = 0;
     this.selectedEl = null;
+    this.undoHistory = [];
+    this.isApplyingUndo = false;
     this.canvas = document.getElementById('layout-canvas');
     this.initPalette();
     this.initCanvasEvents();
@@ -50,6 +52,11 @@ class LayoutTool {
     const el = { id, label: item.label, x, y, w: item.w, h: item.h, bg: item.bg, textColor: item.textColor || '#64748b' };
     this.elements.push(el);
     this.renderElement(el);
+    this.pushUndoAction({
+      type: 'removeElement',
+      elementId: el.id,
+      elemIdCounter: this.elemIdCounter - 1,
+    });
   }
   renderElement(el) {
     const div = document.createElement('div');
@@ -61,19 +68,47 @@ class LayoutTool {
     div.addEventListener('mousedown', e => {
       dragging = true;
       this.selectElement(el, div);
+      const dragStart = { x: el.x, y: el.y };
+      let moved = false;
       ox = e.clientX - el.x; oy = e.clientY - el.y;
       e.preventDefault();
+      const onMouseMove = event => {
+        if (!dragging) return;
+        const nextX = Math.max(0, event.clientX - ox);
+        const nextY = Math.max(0, event.clientY - oy);
+        if (nextX !== el.x || nextY !== el.y) moved = true;
+        el.x = nextX;
+        el.y = nextY;
+        div.style.left = el.x + 'px'; div.style.top = el.y + 'px';
+      };
+      const onMouseUp = () => {
+        if (dragging && moved) {
+          this.pushUndoAction({
+            type: 'moveElement',
+            elementId: el.id,
+            x: dragStart.x,
+            y: dragStart.y,
+          });
+        }
+        dragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     });
-    document.addEventListener('mousemove', e => {
-      if (!dragging) return;
-      el.x = Math.max(0, e.clientX - ox);
-      el.y = Math.max(0, e.clientY - oy);
-      div.style.left = el.x + 'px'; div.style.top = el.y + 'px';
-    });
-    document.addEventListener('mouseup', () => { dragging = false; });
     div.addEventListener('dblclick', () => {
       const name = prompt('ラベル:', el.label);
-      if (name) { el.label = name; div.textContent = name; }
+      if (name && name !== el.label) {
+        const oldLabel = el.label;
+        el.label = name;
+        div.textContent = name;
+        this.pushUndoAction({
+          type: 'renameElement',
+          elementId: el.id,
+          label: oldLabel,
+        });
+      }
     });
     this.canvas.appendChild(div);
   }
@@ -86,9 +121,89 @@ class LayoutTool {
     this.selectedEl = null;
     this.canvas.querySelectorAll('.layout-element').forEach(e => e.classList.remove('selected'));
   }
+  pushUndoAction(action) {
+    if (this.isApplyingUndo || !action) return;
+    this.undoHistory.push(action);
+  }
+  getElementById(elementId) {
+    return this.elements.find(element => element.id === elementId) || null;
+  }
+  removeElementById(elementId) {
+    const index = this.elements.findIndex(element => element.id === elementId);
+    if (index < 0) return null;
+    const [element] = this.elements.splice(index, 1);
+    const div = document.getElementById(elementId);
+    if (div) div.remove();
+    if (this.selectedEl && this.selectedEl.id === elementId) this.selectedEl = null;
+    return element;
+  }
+  restoreSnapshot(snapshot) {
+    if (!snapshot) return;
+    this.elements = snapshot.elements.map(element => ({ ...element }));
+    this.elemIdCounter = snapshot.elemIdCounter;
+    this.selectedEl = null;
+    this.canvas.querySelectorAll('.layout-element').forEach(element => element.remove());
+    this.elements.forEach(element => this.renderElement(element));
+  }
+  undoLastAction() {
+    const action = this.undoHistory.pop();
+    if (!action) {
+      showToast('戻せる操作がありません');
+      return;
+    }
+
+    this.isApplyingUndo = true;
+    try {
+      if (action.type === 'removeElement') {
+        this.removeElementById(action.elementId);
+        this.elemIdCounter = action.elemIdCounter;
+        showToast('一つ戻しました');
+        return;
+      }
+
+      if (action.type === 'moveElement') {
+        const element = this.getElementById(action.elementId);
+        const div = element ? document.getElementById(element.id) : null;
+        if (element && div) {
+          element.x = action.x;
+          element.y = action.y;
+          div.style.left = `${element.x}px`;
+          div.style.top = `${element.y}px`;
+        }
+        showToast('一つ戻しました');
+        return;
+      }
+
+      if (action.type === 'renameElement') {
+        const element = this.getElementById(action.elementId);
+        const div = element ? document.getElementById(element.id) : null;
+        if (element && div) {
+          element.label = action.label;
+          div.textContent = action.label;
+        }
+        showToast('一つ戻しました');
+        return;
+      }
+
+      if (action.type === 'clearAll') {
+        this.restoreSnapshot(action.snapshot);
+        showToast('一つ戻しました');
+        return;
+      }
+
+      showToast('戻し処理に失敗しました');
+    } finally {
+      this.isApplyingUndo = false;
+    }
+  }
   clearAll() {
+    const snapshot = {
+      elements: this.elements.map(element => ({ ...element })),
+      elemIdCounter: this.elemIdCounter,
+    };
     this.elements = []; this.elemIdCounter = 0;
     this.canvas.querySelectorAll('.layout-element').forEach(e => e.remove());
+    this.pushUndoAction({ type: 'clearAll', snapshot });
     showToast('キャンバスをクリアしました');
   }
   exportPNG() {

@@ -39,6 +39,9 @@ class DiagramTool {
     this.connections = [];
     this.selectedNode = null;
     this.connectingFrom = null;
+    this.undoHistory = [];
+    this.redoHistory = [];
+    this.isApplyingUndo = false;
     this.nodeIdCounter = 0;
     this.quickAddCounter = 0;
     this.defaultTextStyle = { fontSize: 14, color: '#e5e7eb' };
@@ -132,6 +135,7 @@ class DiagramTool {
   addNodeFromPalette(idx) {
     const comp = this.components[idx];
     if (!comp) return;
+    const quickAddCounterBefore = this.quickAddCounter;
     const canvasWidth = this.canvas.clientWidth;
     const canvasHeight = this.canvas.clientHeight;
     const col = this.quickAddCounter % 4;
@@ -139,7 +143,7 @@ class DiagramTool {
     const x = Math.min(80 + col * 140, Math.max(20, canvasWidth - 180));
     const y = Math.min(90 + row * 90, Math.max(20, canvasHeight - 80));
     this.quickAddCounter++;
-    this.addNode(comp, x, y);
+    this.addNode(comp, x, y, { quickAddCounterBefore });
   }
   initCanvasEvents() {
     this.canvas.addEventListener('dragover', e => e.preventDefault());
@@ -157,8 +161,17 @@ class DiagramTool {
         this.deselectAll();
       }
     });
+    document.addEventListener('keydown', e => {
+      const target = e.target;
+      const isEditingField = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
+      if (isEditingField) return;
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (!this.selectedNode) return;
+      e.preventDefault();
+      this.deleteSelectedNode();
+    });
   }
-  addNode(comp, x, y) {
+  addNode(comp, x, y, options = {}) {
     const id = this.prefix + '_node_' + (this.nodeIdCounter++);
     const node = {
       id,
@@ -172,6 +185,11 @@ class DiagramTool {
     };
     this.nodes.push(node);
     this.renderNode(node);
+    this.pushUndoAction({
+      type: 'removeNode',
+      nodeId: node.id,
+      quickAddCounter: typeof options.quickAddCounterBefore === 'number' ? options.quickAddCounterBefore : this.quickAddCounter,
+    });
   }
   renderNode(node) {
     const el = document.createElement('div');
@@ -201,25 +219,49 @@ class DiagramTool {
           this.connections.push({ from: this.connectingFrom.id, to: node.id });
           this.drawConnections();
           document.getElementById(this.connectingFrom.id)?.classList.remove('selected');
+          this.pushUndoAction({
+            type: 'removeConnection',
+            from: this.connectingFrom.id,
+            to: node.id,
+          });
           this.connectingFrom = null;
         }
         return;
       }
       dragging = true;
       this.selectNode(node, el);
+      const dragStart = { x: node.x, y: node.y };
+      let moved = false;
       ox = e.clientX - node.x;
       oy = e.clientY - node.y;
       e.preventDefault();
+      const onMouseMove = e => {
+        if (!dragging) return;
+        const nextX = e.clientX - ox;
+        const nextY = e.clientY - oy;
+        if (nextX !== node.x || nextY !== node.y) moved = true;
+        node.x = nextX;
+        node.y = nextY;
+        el.style.left = node.x + 'px';
+        el.style.top = node.y + 'px';
+        this.drawConnections();
+      };
+      const onMouseUp = () => {
+        if (dragging && moved) {
+          this.pushUndoAction({
+            type: 'moveNode',
+            nodeId: node.id,
+            x: dragStart.x,
+            y: dragStart.y,
+          });
+        }
+        dragging = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     });
-    document.addEventListener('mousemove', e => {
-      if (!dragging) return;
-      node.x = e.clientX - ox;
-      node.y = e.clientY - oy;
-      el.style.left = node.x + 'px';
-      el.style.top = node.y + 'px';
-      this.drawConnections();
-    });
-    document.addEventListener('mouseup', () => { dragging = false; });
     // Double click to rename inline
     el.addEventListener('dblclick', e => {
       e.preventDefault();
@@ -260,6 +302,7 @@ class DiagramTool {
     const finish = () => {
       if (this.editingNodeId !== node.id) return;
       const newName = labelEl.textContent.trim();
+      const oldName = node.label;
       node.label = newName || labelEl.dataset.originalText || node.label;
       labelEl.textContent = node.label;
       this.applyNodeTextStyle(node, labelEl);
@@ -267,6 +310,13 @@ class DiagramTool {
       labelEl.classList.remove('editing');
       delete labelEl.dataset.originalText;
       this.editingNodeId = null;
+      if (node.label !== oldName) {
+        this.pushUndoAction({
+          type: 'renameNode',
+          nodeId: node.id,
+          label: oldName,
+        });
+      }
       labelEl.removeEventListener('blur', onBlur);
       labelEl.removeEventListener('keydown', onKeyDown);
     };
@@ -294,6 +344,223 @@ class DiagramTool {
   deselectAll() {
     this.selectedNode = null;
     this.canvas.querySelectorAll('.diagram-node').forEach(n => n.classList.remove('selected'));
+  }
+  pushUndoAction(action) {
+    if (this.isApplyingUndo || !action) return;
+    this.undoHistory.push(action);
+    this.redoHistory = [];
+  }
+  pushRedoAction(action) {
+    if (!action) return;
+    this.redoHistory.push(action);
+  }
+  getNodeById(nodeId) {
+    return this.nodes.find(node => node.id === nodeId) || null;
+  }
+  captureSnapshot() {
+    return {
+      nodes: this.nodes.map(node => ({ ...node })),
+      connections: this.connections.map(conn => ({ ...conn })),
+      nodeIdCounter: this.nodeIdCounter,
+      quickAddCounter: this.quickAddCounter,
+    };
+  }
+  detachNode(nodeId) {
+    const index = this.nodes.findIndex(node => node.id === nodeId);
+    if (index < 0) return null;
+    const [node] = this.nodes.splice(index, 1);
+    const removedConnections = this.connections.filter(conn => conn.from === nodeId || conn.to === nodeId);
+    this.connections = this.connections.filter(conn => conn.from !== nodeId && conn.to !== nodeId);
+    const el = document.getElementById(nodeId);
+    if (el) el.remove();
+    if (this.selectedNode && this.selectedNode.id === nodeId) this.selectedNode = null;
+    if (this.editingNodeId === nodeId) this.editingNodeId = null;
+    if (this.connectingFrom && this.connectingFrom.id === nodeId) {
+      this.connectingFrom = null;
+      this.connectMode = false;
+      if (typeof this.updateConnectButton === 'function') this.updateConnectButton();
+      this.canvas.style.cursor = 'default';
+    }
+    return {
+      node,
+      connections: removedConnections,
+    };
+  }
+  restoreNode(node, connections = []) {
+    if (!node) return;
+    this.nodes.push(node);
+    this.renderNode(node);
+    connections.forEach(conn => this.connections.push(conn));
+    this.drawConnections();
+  }
+  restoreSnapshot(snapshot) {
+    if (!snapshot) return;
+    this.nodes = snapshot.nodes.map(node => ({ ...node }));
+    this.connections = snapshot.connections.map(conn => ({ ...conn }));
+    this.nodeIdCounter = snapshot.nodeIdCounter;
+    this.quickAddCounter = snapshot.quickAddCounter;
+    this.selectedNode = null;
+    this.connectingFrom = null;
+    this.editingNodeId = null;
+    this.canvas.querySelectorAll('.diagram-node').forEach(nodeEl => nodeEl.remove());
+    this.svg.innerHTML = '';
+    this.nodes.forEach(node => this.renderNode(node));
+    this.drawConnections();
+  }
+  applyHistoryAction(action) {
+    if (!action) return null;
+
+    if (action.type === 'removeNode') {
+      const removed = this.detachNode(action.nodeId);
+      if (!removed) return null;
+      return {
+        type: 'restoreNode',
+        node: { ...removed.node },
+        connections: removed.connections.map(conn => ({ ...conn })),
+      };
+    }
+
+    if (action.type === 'restoreNode') {
+      this.restoreNode(action.node, action.connections || []);
+      return {
+        type: 'removeNode',
+        nodeId: action.node.id,
+      };
+    }
+
+    if (action.type === 'moveNode') {
+      const node = this.getNodeById(action.nodeId);
+      const el = node ? document.getElementById(node.id) : null;
+      if (!node || !el) return null;
+      const inverse = { type: 'moveNode', nodeId: action.nodeId, x: node.x, y: node.y };
+      node.x = action.x;
+      node.y = action.y;
+      el.style.left = `${node.x}px`;
+      el.style.top = `${node.y}px`;
+      this.drawConnections();
+      return inverse;
+    }
+
+    if (action.type === 'removeConnection') {
+      const beforeCount = this.connections.length;
+      this.connections = this.connections.filter(conn => !(conn.from === action.from && conn.to === action.to));
+      if (this.connections.length === beforeCount) return null;
+      this.drawConnections();
+      return {
+        type: 'addConnection',
+        from: action.from,
+        to: action.to,
+      };
+    }
+
+    if (action.type === 'addConnection') {
+      this.connections.push({ from: action.from, to: action.to });
+      this.drawConnections();
+      return {
+        type: 'removeConnection',
+        from: action.from,
+        to: action.to,
+      };
+    }
+
+    if (action.type === 'renameNode') {
+      const node = this.getNodeById(action.nodeId);
+      const labelEl = node ? document.getElementById(node.id)?.querySelector('.node-label') : null;
+      if (!node || !labelEl) return null;
+      const inverse = { type: 'renameNode', nodeId: action.nodeId, label: node.label };
+      node.label = action.label;
+      labelEl.textContent = action.label;
+      this.applyNodeTextStyle(node, labelEl);
+      return inverse;
+    }
+
+    if (action.type === 'styleNode') {
+      const node = this.getNodeById(action.nodeId);
+      const labelEl = node ? document.getElementById(node.id)?.querySelector('.node-label') : null;
+      if (!node || !labelEl) return null;
+      const inverse = {
+        type: 'styleNode',
+        nodeId: action.nodeId,
+        textSize: node.textSize,
+        textColor: node.textColor,
+      };
+      node.textSize = action.textSize;
+      node.textColor = action.textColor;
+      this.applyNodeTextStyle(node, labelEl);
+      if (this.selectedNode && this.selectedNode.id === node.id) this.syncTextStyleControls(node);
+      return inverse;
+    }
+
+    if (action.type === 'clearAll') {
+      this.restoreSnapshot(action.snapshot);
+      return { type: 'clearCanvas', snapshot: action.snapshot };
+    }
+
+    if (action.type === 'clearCanvas') {
+      const snapshot = this.captureSnapshot();
+      this.nodes = [];
+      this.connections = [];
+      this.nodeIdCounter = 0;
+      this.quickAddCounter = 0;
+      this.canvas.querySelectorAll('.diagram-node').forEach(n => n.remove());
+      this.svg.innerHTML = '';
+      return { type: 'clearAll', snapshot };
+    }
+
+    return null;
+  }
+  undoLastAction() {
+    const action = this.undoHistory.pop();
+    if (!action) {
+      showToast('戻せる操作がありません');
+      return;
+    }
+
+    this.isApplyingUndo = true;
+    try {
+      const redoAction = this.applyHistoryAction(action);
+      if (redoAction) this.pushRedoAction(redoAction);
+      showToast('一つ戻しました');
+    } finally {
+      this.isApplyingUndo = false;
+    }
+  }
+  redoLastAction() {
+    const action = this.redoHistory.pop();
+    if (!action) {
+      showToast('進められる操作がありません');
+      return;
+    }
+
+    this.isApplyingUndo = true;
+    try {
+      const undoAction = this.applyHistoryAction(action);
+      if (undoAction) this.undoHistory.push(undoAction);
+      showToast('一つ先に戻しました');
+    } finally {
+      this.isApplyingUndo = false;
+    }
+  }
+  deleteSelectedNode() {
+    const node = this.selectedNode;
+    if (!node) {
+      showToast('削除する図形を選択してください');
+      return;
+    }
+
+    const snapshotNode = { ...node };
+    const snapshotConnections = this.connections
+      .filter(conn => conn.from === node.id || conn.to === node.id)
+      .map(conn => ({ ...conn }));
+    this.detachNode(node.id);
+    this.pushUndoAction({
+      type: 'restoreNode',
+      node: snapshotNode,
+      connections: snapshotConnections,
+    });
+    this.deselectAll();
+    this.drawConnections();
+    showToast('選択した図形を削除しました');
   }
   initTextStyleControls() {
     this.fontSizeControl = document.getElementById(this.prefix + '-font-size');
@@ -326,8 +593,18 @@ class DiagramTool {
       const option = e.target.closest('[data-color]');
       if (!option) return;
       const selectedColor = option.dataset.color || '';
+      const node = this.selectedNode;
+      const previousState = node ? { textSize: node.textSize, textColor: node.textColor } : null;
       this.setTextColor(selectedColor);
       applyCurrent();
+      if (node && previousState) {
+        this.pushUndoAction({
+          type: 'styleNode',
+          nodeId: node.id,
+          textSize: previousState.textSize,
+          textColor: previousState.textColor,
+        });
+      }
       this.textColorPicker.open = false;
     });
     if (this.otherColorButton) {
@@ -345,8 +622,18 @@ class DiagramTool {
       });
       this.nativeColorInput.addEventListener('input', () => {
         const selectedColor = this.nativeColorInput.value;
+        const node = this.selectedNode;
+        const previousState = node ? { textSize: node.textSize, textColor: node.textColor } : null;
         this.setTextColor(selectedColor);
         applyCurrent();
+        if (node && previousState) {
+          this.pushUndoAction({
+            type: 'styleNode',
+            nodeId: node.id,
+            textSize: previousState.textSize,
+            textColor: previousState.textColor,
+          });
+        }
         this.textColorPicker.open = false;
       });
     }
@@ -457,9 +744,12 @@ class DiagramTool {
     });
   }
   clearAll() {
+    const snapshot = this.captureSnapshot();
     this.nodes = []; this.connections = []; this.nodeIdCounter = 0;
+    this.quickAddCounter = 0;
     this.canvas.querySelectorAll('.diagram-node').forEach(n => n.remove());
     this.svg.innerHTML = '';
+    this.pushUndoAction({ type: 'clearAll', snapshot });
     showToast('キャンバスをクリアしました');
   }
   autoLayout() {
